@@ -1,0 +1,106 @@
+{
+  "order_id": {
+    "name": "order_id",
+    "sql_type": "TEXT",
+    "role": "id",
+    "cardinality": 11778,
+    "null_pct": 0.0,
+    "null_count": 0
+  },
+  "customer_id": {
+    "name": "customer_id",
+    "sql_type": "TEXT",
+    "role": "id",
+    "cardinality": 300,
+    "null_pct": 0.0,
+    "null_count": 0
+  },
+  "order_date": {
+    "name": "order_date",
+    "sql_type": "TEXT",
+    "role": "datetime",
+    "cardinality": 181,
+    "null_pct": 0.0,
+    "null_count": 0
+  },
+  "city": {
+    "name": "city",
+    "sql_type": "TEXT",
+    "role": "categorical",
+    "cardinality": 8,
+    "null_pct": 0.0,
+    "null_count": 0
+  },
+  "area": {
+    "name": "area",
+    "sql_type": "TEXT",
+    "role": "categorical",
+    "cardinality": 40,
+    "null_pct": 0.0,
+    "null_count": 0
+  },
+  "category": {
+    "name": "category",
+    "sql_type": "TEXT",
+    "role": "categorical",
+    "cardinality": 8,
+    "null_pct": 0.0,
+    "null_count": 0
+  },
+  "product_name": {
+    "name": "product_name",
+    "sql_type": "TEXT",
+    "role": "categorical",
+    "cardinality": 47,
+    "null_pct": 0.0,
+    "null_count": 0
+  },
+  "quantity": {
+    "name": "quantity",
+    "sql_type": "INTEGER",
+    "role": "numeric_measure",
+    "cardinality": 4,
+    "null_pct": 0.0,
+    "null_count": 0
+  },
+  "unit_price": {
+    "name": "unit_price",
+    "sql_type": "INTEGER",
+    "role": "numeric_measure",
+    "cardinality": 34,
+    "null_pct": 0.0,
+    "null_count": 0
+  },
+  "total_amount": {
+    "name": "total_amount",
+    "sql_type": "INTEGER",
+    "role": "numeric_measure",
+    "cardinality": 116,
+    "null_pct": 0.0,
+    "null_count": 0
+  },
+  "payment_method": {
+    "name": "payment_method",
+    "sql_type": "TEXT",
+    "role": "categorical",
+    "cardinality": 5,
+    "null_pct": 0.0,
+    "null_count": 0
+  },
+  "order_status": {
+    "name": "order_status",
+    "sql_type": "TEXT",
+    "role": "categorical",
+    "cardinality": 2,
+    "null_pct": 0.0,
+    "null_count": 0
+  },
+  "delivery_time_min": {
+    "name": "delivery_time_min",
+    "sql_type": "INTEGER",
+    "role": "numeric_measure",
+    "cardinality": 21,
+    "null_pct": 0.0,
+    "null_count": 0
+  }
+}

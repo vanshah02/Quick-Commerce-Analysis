@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quick Analyser & SQL Portfolio</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+</head>
+<body>
+    <!-- Top Navigation -->
+    <header class="top-nav">
+        <div class="nav-left">
+            <div class="logo">
+                <span class="logo-z">Q</span> Quick Analyser
+            </div>
+            <div class="dataset-status">
+                <span class="status-dot"></span> Active Database: <strong id="current-db">zomato_analytics.db</strong>
+            </div>
+        </div>
+        <div class="nav-right">
+            <button id="btn-upload" class="btn btn-outline">Upload Dataset</button>
+            <button id="btn-reset" class="btn btn-outline">Reset to Default</button>
+            <button id="btn-sql-studio" class="btn btn-primary">SQL Studio</button>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="dashboard-container">
+        <!-- Sidebar / Filter Panel -->
+        <aside class="sidebar">
+            <h3>Filters</h3>
+            <div id="dynamic-filters">
+                <!-- Filters will be populated here by app.js -->
+            </div>
+            <button id="apply-filters" class="btn btn-primary w-full mt-3">Apply Filters</button>
+            
+        </aside>
+
+        <!-- Main Content Area -->
+        <div class="content-area">
+            
+            <!-- KPI Ribbon -->
+            <section class="kpi-ribbon" id="kpi-ribbon">
+                <!-- KPIs will be populated here by app.js -->
+            </section>
+
+            <!-- Dashboard Grid -->
+            <div class="dashboard-grid">
+                
+                <!-- Chart: Group Contribution -->
+                <div class="chart-card col-span-2" id="card-group-contribution" style="display: none;">
+                    <div class="card-header">
+                        <h2 id="title-group-contribution">Group Contribution</h2>
+                        <button class="btn-view-sql" onclick="viewSql('group_contribution')">View SQL</button>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="chart-group-contribution"></canvas>
+                    </div>
+                </div>
+
+                <!-- Chart: Top Items by Quantity -->
+                <div class="chart-card col-span-2" id="card-top-items-qty" style="display: none;">
+                    <div class="card-header">
+                        <h2 id="title-top-items-qty">Top Items by Quantity</h2>
+                        <button class="btn-view-sql" onclick="viewSql('top_items_qty')">View SQL</button>
+                    </div>
+                    <div class="table-container">
+                        <table id="table-top-items-qty">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Quantity Sold</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Chart: Top Items by Frequency -->
+                <div class="chart-card col-span-2" id="card-top-items-freq" style="display: none;">
+                    <div class="card-header">
+                        <h2 id="title-top-items-freq">Top Items by Order Frequency</h2>
+                        <button class="btn-view-sql" onclick="viewSql('top_items_freq')">View SQL</button>
+                    </div>
+                    <div class="table-container">
+                        <table id="table-top-items-freq">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Order Frequency</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Chart: Most Profitable Dishes -->
+                <div class="chart-card col-span-2" id="card-top-items-profit" style="display: none;">
+                    <div class="card-header">
+                        <h2 id="title-top-items-profit">Most Profitable Dishes</h2>
+                        <button class="btn-view-sql" onclick="viewSql('top_items_profit')">View SQL</button>
+                    </div>
+                    <div class="table-container">
+                        <table id="table-top-items-profit">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Item</th>
+                                    <th>Profit</th>
+                                    <th>Margin %</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Chart: Time Series Heatmap -->
+                <div class="chart-card col-span-2" id="card-time-series" style="display: none;">
+                    <div class="card-header">
+                        <h2 id="title-time-series">Time Series</h2>
+                        <button class="btn-view-sql" onclick="viewSql('time_series')">View SQL</button>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="chart-time-series"></canvas>
+                    </div>
+                </div>
+
+                <!-- Chart: Best Combos -->
+                <div class="chart-card col-span-4" id="card-best-combos" style="display: none;">
+                    <div class="card-header">
+                        <h2 id="title-best-combos">Best Combos</h2>
+                        <button class="btn-view-sql" onclick="viewSql('best_combos')">View SQL</button>
+                    </div>
+                    <div class="table-container">
+                        <table id="table-best-combos">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Item A + Item B</th>
+                                    <th>Times ordered together</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- SQL Viewer Modal -->
+    <div id="modal-sql" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('modal-sql')">&times;</span>
+            <h2>SQL Query Inspector</h2>
+            <p>This is the exact SQL query dynamically generated and executed against SQLite to produce this widget.</p>
+            <pre><code id="sql-code-block" class="language-sql"></code></pre>
+        </div>
+    </div>
+
+    <!-- Upload Modal -->
+    <div id="modal-upload" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('modal-upload')">&times;</span>
+            <h2>Upload Custom Dataset</h2>
+            <p>Upload any CSV file. The backend will inspect the schema, map columns to roles, and instantly rebuild the dashboard without any hardcoded mapping.</p>
+            <form id="upload-form">
+                <input type="file" id="csv-file" accept=".csv" required>
+                <button type="submit" class="btn btn-primary mt-3">Upload & Rebuild DB</button>
+            </form>
+            <div id="upload-status" class="mt-2"></div>
+        </div>
+    </div>
+
+    <!-- SQL Studio Modal -->
+    <div id="modal-studio" class="modal modal-large">
+        <div class="modal-content studio-content">
+            <div class="studio-header">
+                <h2>Interactive SQL Studio</h2>
+                <span class="close-btn" onclick="closeModal('modal-studio')">&times;</span>
+            </div>
+            <div class="studio-body">
+                <div class="studio-sidebar">
+                    <h3>Interview Queries</h3>
+                    <ul id="query-library">
+                        <!-- Loaded dynamically -->
+                    </ul>
+                </div>
+                <div class="studio-main">
+                    <textarea id="sql-editor" placeholder="SELECT * FROM dataset LIMIT 10;"></textarea>
+                    <div class="studio-actions">
+                        <button class="btn btn-primary" onclick="executeStudioQuery()">Run Query</button>
+                        <button class="btn btn-outline" onclick="exportStudioResults()">Export CSV</button>
+                        <span id="studio-status"></span>
+                    </div>
+                    <div class="table-container studio-results">
+                        <table id="table-studio">
+                            <thead></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/js/charts.js"></script>
+    <script src="/js/sql_editor.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html>
