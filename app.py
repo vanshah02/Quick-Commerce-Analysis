@@ -1,136 +1,176 @@
 import os
 import json
-from http.server import HTTPServer, SimpleHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
+from flask import Flask, request, jsonify, session, redirect, url_for, send_from_directory
+from authlib.integrations.flask_client import OAuth
+from dotenv import load_dotenv
+import pandas as pd
 import db_manager
 
-PORT = 8000
+load_dotenv()
 
-class AnalyticsRequestHandler(SimpleHTTPRequestHandler):
+app = Flask(__name__, static_folder='static', static_url_path='')
+app.secret_key = os.getenv('SECRET_KEY', 'dev_secret_key_12345')
+
+oauth = OAuth(app)
+google = oauth.register(
+    name='google',
+    client_id=os.getenv('GOOGLE_CLIENT_ID', 'DUMMY_ID'),
+    client_secret=os.getenv('GOOGLE_CLIENT_SECRET', 'DUMMY_SECRET'),
+    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+    client_kwargs={'scope': 'openid email profile'},
+)
+
+def is_logged_in():
+    return 'user' in session
+
+@app.route('/')
+def index():
+    return send_from_directory('static', 'index.html')
+
+@app.route('/login')
+def login():
+    redirect_uri = url_for('auth', _external=True)
+    return google.authorize_redirect(redirect_uri)
+
+@app.route('/auth/callback')
+def auth():
+    token = google.authorize_access_token()
+    user = google.parse_id_token(token, nonce=None)
+    if user:
+        session['user'] = user
+    return redirect('/')
+
+@app.route('/logout')
+def logout():
+    session.pop('user', None)
+    return redirect('/')
+
+@app.route('/api/auth_status')
+def auth_status():
+    if is_logged_in():
+        return jsonify({"logged_in": True, "user": session['user']})
+    return jsonify({"logged_in": False})
+
+@app.route('/api/analytics', methods=['GET'])
+def analytics():
+    if not is_logged_in():
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
     
-    def end_headers(self):
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-        super().end_headers()
+    filters = request.args.to_dict()
+    success, data = db_manager.get_analytics_data(filters)
+    if success:
+        return jsonify({"status": "success", "data": data})
+    else:
+        return jsonify({"status": "error", "message": data}), 500
 
-    def do_OPTIONS(self):
-        self.send_response(200, "ok")
-        self.end_headers()
-        
-    def send_json(self, data, status_code=200):
-        self.send_response(status_code)
-        self.send_header('Content-type', 'application/json')
-        self.end_headers()
-        self.wfile.write(json.dumps(data).encode('utf-8'))
-        
-    def do_GET(self):
-        parsed_url = urlparse(self.path)
-        path = parsed_url.path
-        
-        if path == '/api/analytics':
-            query_components = parse_qs(parsed_url.query)
-            filters = {k: v[0] for k, v in query_components.items()}
-            
-            success, data = db_manager.get_analytics_data(filters)
-            if success:
-                self.send_json({"status": "success", "data": data})
-            else:
-                self.send_json({"status": "error", "message": data}, 500)
-                
-        elif path == '/api/schema':
-            success, data = db_manager.get_schema_summary()
-            if success:
-                self.send_json({"status": "success", "data": data})
-            else:
-                self.send_json({"status": "error", "message": data}, 500)
-                
-        elif path == '/api/filters':
-            success, data = db_manager.get_filter_options()
-            if success:
-                self.send_json({"status": "success", "data": data})
-            else:
-                self.send_json({"status": "error", "message": data}, 500)
-                
-        elif path == '/api/playground_queries':
-            queries = db_manager.get_playground_queries()
-            self.send_json({"status": "success", "data": queries})
-            
-        else:
-            # Serve static files for all other GET requests
-            super().do_GET()
+@app.route('/api/schema', methods=['GET'])
+def schema():
+    if not is_logged_in():
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+    
+    success, data = db_manager.get_schema_summary()
+    if success:
+        return jsonify({"status": "success", "data": data})
+    else:
+        return jsonify({"status": "error", "message": data}), 500
 
-    def do_POST(self):
-        parsed_url = urlparse(self.path)
-        path = parsed_url.path
+@app.route('/api/filters', methods=['GET'])
+def filters():
+    if not is_logged_in():
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
         
-        if path == '/api/query':
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length)
+    success, data = db_manager.get_filter_options()
+    if success:
+        return jsonify({"status": "success", "data": data})
+    else:
+        return jsonify({"status": "error", "message": data}), 500
+
+@app.route('/api/playground_queries', methods=['GET'])
+def playground_queries():
+    if not is_logged_in():
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+        
+    queries = db_manager.get_playground_queries()
+    return jsonify({"status": "success", "data": queries})
+
+@app.route('/api/query', methods=['POST'])
+def query():
+    if not is_logged_in():
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+        
+    data = request.json
+    sql = data.get('sql', '')
+    success, res = db_manager.run_playground_query(sql)
+    if success:
+        return jsonify({"status": "success", "data": res})
+    else:
+        return jsonify({"status": "error", "message": res}), 400
+
+@app.route('/api/upload', methods=['POST'])
+def upload():
+    if not is_logged_in():
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+        
+    if 'file' not in request.files:
+        return jsonify({"status": "error", "message": "No file part"}), 400
+        
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"status": "error", "message": "No selected file"}), 400
+        
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in ['.csv', '.xls', '.xlsx']:
+        return jsonify({"status": "error", "message": "Unsupported file format"}), 400
+        
+    upload_path = os.path.join(os.getcwd(), 'uploaded_dataset' + ext)
+    file.save(upload_path)
+    
+    sheet_name = request.form.get('sheet_name', None)
+    
+    if ext in ['.xls', '.xlsx'] and sheet_name is None:
+        try:
+            xl = pd.ExcelFile(upload_path)
+            if len(xl.sheet_names) > 1:
+                return jsonify({
+                    "status": "multiple_sheets",
+                    "sheets": xl.sheet_names,
+                    "filename": file.filename
+                })
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)}), 400
             
-            try:
-                payload = json.loads(post_data.decode('utf-8'))
-                sql = payload.get('sql', '')
-                
-                success, data = db_manager.run_playground_query(sql)
-                if success:
-                    self.send_json({"status": "success", "data": data})
-                else:
-                    self.send_json({"status": "error", "message": data}, 400)
-            except Exception as e:
-                self.send_json({"status": "error", "message": str(e)}, 400)
-                
-        elif path == '/api/upload':
-            # Handle raw file upload
-            content_length = int(self.headers.get('Content-Length', 0))
-            if content_length == 0:
-                self.send_json({"status": "error", "message": "No file content"}, 400)
-                return
-                
-            file_data = self.rfile.read(content_length)
-            upload_path = os.path.join(os.getcwd(), 'uploaded_dataset.csv')
-            with open(upload_path, 'wb') as f:
-                f.write(file_data)
-                
-            # Re-initialize the DB with the new file
-            success, msg = db_manager.init_db(upload_path)
-            if success:
-                self.send_json({"status": "success", "message": "Dataset uploaded and DB rebuilt."})
-            else:
-                self.send_json({"status": "error", "message": f"Failed to rebuild DB: {msg}"}, 500)
-                
-        elif path == '/api/reset':
-            # Reset to default Zomato_Orders.csv
-            success, msg = db_manager.init_db(db_manager.DEFAULT_CSV)
-            if success:
-                self.send_json({"status": "success", "message": "Reset to default dataset."})
-            else:
-                self.send_json({"status": "error", "message": f"Failed to reset: {msg}"}, 500)
-                
-        else:
-            self.send_response(404)
-            self.end_headers()
+    success, msg = db_manager.init_db(upload_path, sheet_name=sheet_name)
+    if success:
+        return jsonify({"status": "success", "message": "Dataset uploaded and DB rebuilt."})
+    else:
+        return jsonify({"status": "error", "message": f"Failed to rebuild DB: {msg}"}), 500
+
+@app.route('/api/upload_sheet', methods=['POST'])
+def upload_sheet():
+    if not is_logged_in():
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+        
+    sheet_name = request.json.get('sheet_name')
+    filename = request.json.get('filename')
+    ext = os.path.splitext(filename)[1].lower()
+    upload_path = os.path.join(os.getcwd(), 'uploaded_dataset' + ext)
+    
+    success, msg = db_manager.init_db(upload_path, sheet_name=sheet_name)
+    if success:
+        return jsonify({"status": "success", "message": "Sheet loaded and DB rebuilt."})
+    else:
+        return jsonify({"status": "error", "message": f"Failed to rebuild DB: {msg}"}), 500
+
+@app.route('/api/reset', methods=['POST'])
+def reset():
+    if not is_logged_in():
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+        
+    success, msg = db_manager.init_db(db_manager.DEFAULT_CSV)
+    if success:
+        return jsonify({"status": "success", "message": "Reset to default dataset."})
+    else:
+        return jsonify({"status": "error", "message": f"Failed to reset: {msg}"}), 500
 
 if __name__ == '__main__':
-    # Change working directory to static so that simple requests serve index.html naturally, 
-    # but since our backend is in the root, it's better to just run from root and let static/ be served.
-    # We will map "/" to serve "static/index.html"
-    class CustomHandler(AnalyticsRequestHandler):
-        def translate_path(self, path):
-            if path == "/":
-                return os.path.join(os.getcwd(), "static", "index.html")
-            elif path.startswith("/static/"):
-                return os.path.join(os.getcwd(), path[1:])
-            else:
-                # default fallback
-                return os.path.join(os.getcwd(), "static", path[1:])
-
-    server_address = ('', PORT)
-    httpd = HTTPServer(server_address, CustomHandler)
-    print(f"Starting server on http://localhost:{PORT}")
-    try:
-        httpd.serve_forever()
-    except KeyboardInterrupt:
-        pass
-    print("Stopping server.")
-    httpd.server_close()
+    app.run(host='0.0.0.0', port=8000, debug=True)

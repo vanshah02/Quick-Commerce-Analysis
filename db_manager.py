@@ -8,14 +8,21 @@ DB_PATH = "zomato_analytics.db"
 DEFAULT_CSV = "Zomato_Orders.csv"
 TABLE_NAME = "dataset"
 
-def init_db(csv_path=DEFAULT_CSV):
-    """Initializes the SQLite database from a CSV file using dynamic schema detection."""
-    if not os.path.exists(csv_path):
-        return False, f"CSV file not found: {csv_path}"
+def init_db(file_path=DEFAULT_CSV, sheet_name=None):
+    """Initializes the SQLite database from a CSV or Excel file using dynamic schema detection."""
+    if not os.path.exists(file_path):
+        return False, f"File not found: {file_path}"
     
     try:
-        # Load CSV
-        df = pd.read_csv(csv_path)
+        # Load Data
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext in ['.xls', '.xlsx']:
+            if sheet_name:
+                df = pd.read_excel(file_path, sheet_name=sheet_name)
+            else:
+                df = pd.read_excel(file_path)
+        else:
+            df = pd.read_csv(file_path)
         
         # Normalize column names (lowercase, strip whitespace)
         df.columns = df.columns.str.lower().str.strip()
@@ -137,39 +144,113 @@ def get_analytics_data(filters=None):
             sql_used["time_series"] = q.strip()
             available_widgets.append("time_series")
             
-    # Explicit Food Analytics Panels
+    # Semantic Column Identification
+    item_col = next((c for c in schema if any(x in c.lower() for x in ['item', 'product', 'dish', 'name'])), None)
+    qty_col = next((c for c in schema if any(x in c.lower() for x in ['qty', 'quantity'])), None)
+    profit_col = next((c for c in schema if any(x in c.lower() for x in ['profit', 'margin'])), None)
+    revenue_col = next((c for c in schema if any(x in c.lower() for x in ['revenue', 'sales', 'total_amount', 'amount'])), None)
+    
     # A. Top items by quantity
-    q, p = query_builder.build_top_items_by_quantity(schema, filters, TABLE_NAME)
-    success, res = execute_query(q, p)
-    if success:
-        data["top_items_qty"] = {"rows": res}
-        sql_used["top_items_qty"] = q.strip()
-        available_widgets.append("top_items_qty")
+    if item_col and qty_col:
+        q, p = query_builder.build_top_items_by_quantity(schema, filters, item_col, qty_col, TABLE_NAME)
+        success, res = execute_query(q, p)
+        if success:
+            data["top_items_qty"] = {
+                "title": f"Top {item_col.replace('_', ' ').title()} by {qty_col.replace('_', ' ').title()}",
+                "headers": [item_col.replace('_', ' ').title(), f"{qty_col.replace('_', ' ').title()} Sold"],
+                "rows": res
+            }
+            sql_used["top_items_qty"] = q.strip()
+            available_widgets.append("top_items_qty")
 
     # B. Top items by order frequency
-    q, p = query_builder.build_top_items_by_frequency(schema, filters, TABLE_NAME)
-    success, res = execute_query(q, p)
-    if success:
-        data["top_items_freq"] = {"rows": res}
-        sql_used["top_items_freq"] = q.strip()
-        available_widgets.append("top_items_freq")
+    if item_col and id_col:
+        q, p = query_builder.build_top_items_by_frequency(schema, filters, item_col, id_col, TABLE_NAME)
+        success, res = execute_query(q, p)
+        if success:
+            data["top_items_freq"] = {
+                "title": f"Top {item_col.replace('_', ' ').title()} by Order Frequency",
+                "headers": [item_col.replace('_', ' ').title(), "Order Frequency"],
+                "rows": res
+            }
+            sql_used["top_items_freq"] = q.strip()
+            available_widgets.append("top_items_freq")
 
-    # C. Most profitable dishes
-    q, p = query_builder.build_most_profitable_dishes(schema, filters, TABLE_NAME)
-    success, res = execute_query(q, p)
-    if success:
-        data["top_items_profit"] = {"rows": res}
-        sql_used["top_items_profit"] = q.strip()
-        available_widgets.append("top_items_profit")
+    # C. Most profitable / Highest Revenue
+    # We fallback to Revenue if Profit is missing
+    target_val_col = profit_col if profit_col else revenue_col
+    if item_col and target_val_col:
+        q, p = query_builder.build_most_profitable_dishes(schema, filters, item_col, target_val_col, revenue_col, TABLE_NAME)
+        success, res = execute_query(q, p)
+        if success:
+            is_profit = bool(profit_col)
+            data["top_items_profit"] = {
+                "title": "Most Profitable Dishes" if is_profit else f"Top {item_col.replace('_', ' ').title()} by Sales",
+                "headers": ["Rank", item_col.replace('_', ' ').title(), "Profit" if is_profit else "Sales", "Margin %" if is_profit else "% of Total"],
+                "rows": res
+            }
+            sql_used["top_items_profit"] = q.strip()
+            available_widgets.append("top_items_profit")
 
     # D. Best combos
-    q, p = query_builder.build_best_combos_query(schema, filters, TABLE_NAME)
-    success, res = execute_query(q, p)
-    if success:
-        data["best_combos"] = {"rows": res}
-        sql_used["best_combos"] = q.strip()
-        available_widgets.append("best_combos")
+    if item_col and id_col:
+        q, p = query_builder.build_best_combos_query(schema, filters, item_col, id_col, TABLE_NAME)
+        success, res = execute_query(q, p)
+        if success:
+            data["best_combos"] = {
+                "title": "Best Combos",
+                "headers": ["Rank", f"{item_col.replace('_', ' ').title()} A + {item_col.replace('_', ' ').title()} B", "Times ordered together"],
+                "rows": res
+            }
+            sql_used["best_combos"] = q.strip()
+            available_widgets.append("best_combos")
+            
+    # Semantic identification for new features
+    cust_id_col = schema_inspector.get_customer_id_column(schema)
+    location_col = schema_inspector.get_location_column(schema)
     
+    # E. RFM Analysis
+    if cust_id_col and date_col and revenue_col:
+        q, q_top, p, p_top = query_builder.build_rfm_query(schema, filters, cust_id_col, date_col, revenue_col, TABLE_NAME)
+        success, res = execute_query(q, p)
+        success_top, res_top = execute_query(q_top, p_top)
+        
+        if success and success_top:
+            data["rfm"] = {
+                "title": "RFM Analysis (Recency, Frequency, Monetary)",
+                "headers": ["Segment", "Customer Count", "Avg Monetary Value"],
+                "rows": res,
+                "top_headers": [f"Top 10 {cust_id_col.replace('_', ' ').title()}", "Monetary Value"],
+                "top_rows": res_top
+            }
+            sql_used["rfm"] = q.strip() + "\n\n-- Top 10 Customers:\n" + q_top.strip()
+            available_widgets.append("rfm")
+    
+    # F. Churn Analysis
+    if cust_id_col and date_col:
+        q, p = query_builder.build_churn_query(schema, filters, cust_id_col, date_col, location_col, TABLE_NAME)
+        success, res = execute_query(q, p)
+        if success:
+            data["churn"] = {
+                "title": "Churn Analysis (60 Days Inactive)",
+                "headers": ["Location", "Status", "Customer Count"],
+                "rows": res
+            }
+            sql_used["churn"] = q.strip()
+            available_widgets.append("churn")
+            
+    # G. Heatmap
+    if location_col:
+        q, p = query_builder.build_heatmap_query(schema, filters, location_col, TABLE_NAME)
+        success, res = execute_query(q, p)
+        if success:
+            data["heatmap"] = {
+                "title": "Delivery Hotspots",
+                "rows": res
+            }
+            sql_used["heatmap"] = q.strip()
+            available_widgets.append("heatmap")
+            
     data["sql_used"] = sql_used
     data["available_widgets"] = available_widgets
     

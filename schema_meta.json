@@ -1,25 +1,17 @@
 {
   "order_id": {
     "name": "order_id",
-    "sql_type": "TEXT",
+    "sql_type": "INTEGER",
     "role": "id",
-    "cardinality": 11778,
+    "cardinality": 6000,
     "null_pct": 0.0,
     "null_count": 0
   },
-  "customer_id": {
-    "name": "customer_id",
-    "sql_type": "TEXT",
-    "role": "id",
-    "cardinality": 300,
-    "null_pct": 0.0,
-    "null_count": 0
-  },
-  "order_date": {
-    "name": "order_date",
+  "timestamp": {
+    "name": "timestamp",
     "sql_type": "TEXT",
     "role": "datetime",
-    "cardinality": 181,
+    "cardinality": 5297,
     "null_pct": 0.0,
     "null_count": 0
   },
@@ -27,15 +19,31 @@
     "name": "city",
     "sql_type": "TEXT",
     "role": "categorical",
-    "cardinality": 8,
+    "cardinality": 6,
     "null_pct": 0.0,
     "null_count": 0
   },
-  "area": {
-    "name": "area",
+  "zone": {
+    "name": "zone",
     "sql_type": "TEXT",
     "role": "categorical",
-    "cardinality": 40,
+    "cardinality": 25,
+    "null_pct": 0.0,
+    "null_count": 0
+  },
+  "restaurant": {
+    "name": "restaurant",
+    "sql_type": "TEXT",
+    "role": "categorical",
+    "cardinality": 30,
+    "null_pct": 0.0,
+    "null_count": 0
+  },
+  "item": {
+    "name": "item",
+    "sql_type": "TEXT",
+    "role": "categorical",
+    "cardinality": 25,
     "null_pct": 0.0,
     "null_count": 0
   },
@@ -43,15 +51,15 @@
     "name": "category",
     "sql_type": "TEXT",
     "role": "categorical",
-    "cardinality": 8,
+    "cardinality": 5,
     "null_pct": 0.0,
     "null_count": 0
   },
-  "product_name": {
-    "name": "product_name",
+  "cuisine": {
+    "name": "cuisine",
     "sql_type": "TEXT",
     "role": "categorical",
-    "cardinality": 47,
+    "cardinality": 11,
     "null_pct": 0.0,
     "null_count": 0
   },
@@ -59,7 +67,7 @@
     "name": "quantity",
     "sql_type": "INTEGER",
     "role": "numeric_measure",
-    "cardinality": 4,
+    "cardinality": 2,
     "null_pct": 0.0,
     "null_count": 0
   },
@@ -67,39 +75,55 @@
     "name": "unit_price",
     "sql_type": "INTEGER",
     "role": "numeric_measure",
-    "cardinality": 34,
+    "cardinality": 19,
     "null_pct": 0.0,
     "null_count": 0
   },
-  "total_amount": {
-    "name": "total_amount",
+  "unit_cost": {
+    "name": "unit_cost",
+    "sql_type": "REAL",
+    "role": "numeric_measure",
+    "cardinality": 6599,
+    "null_pct": 0.0,
+    "null_count": 0
+  },
+  "line_revenue": {
+    "name": "line_revenue",
     "sql_type": "INTEGER",
     "role": "numeric_measure",
-    "cardinality": 116,
+    "cardinality": 38,
     "null_pct": 0.0,
     "null_count": 0
   },
-  "payment_method": {
-    "name": "payment_method",
-    "sql_type": "TEXT",
-    "role": "categorical",
-    "cardinality": 5,
-    "null_pct": 0.0,
-    "null_count": 0
-  },
-  "order_status": {
-    "name": "order_status",
-    "sql_type": "TEXT",
-    "role": "categorical",
-    "cardinality": 2,
-    "null_pct": 0.0,
-    "null_count": 0
-  },
-  "delivery_time_min": {
-    "name": "delivery_time_min",
-    "sql_type": "INTEGER",
+  "line_profit": {
+    "name": "line_profit",
+    "sql_type": "REAL",
     "role": "numeric_measure",
-    "cardinality": 21,
+    "cardinality": 7541,
+    "null_pct": 0.0,
+    "null_count": 0
+  },
+  "delivery_time_mins": {
+    "name": "delivery_time_mins",
+    "sql_type": "REAL",
+    "role": "numeric_measure",
+    "cardinality": 369,
+    "null_pct": 0.0,
+    "null_count": 0
+  },
+  "rating": {
+    "name": "rating",
+    "sql_type": "REAL",
+    "role": "numeric_measure",
+    "cardinality": 24,
+    "null_pct": 0.0,
+    "null_count": 0
+  },
+  "basket_size": {
+    "name": "basket_size",
+    "sql_type": "INTEGER",
+    "role": "categorical",
+    "cardinality": 4,
     "null_pct": 0.0,
     "null_count": 0
   }

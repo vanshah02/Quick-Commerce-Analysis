@@ -78,7 +78,25 @@ def get_datetime_column(schema):
 
 def get_id_column(schema):
     for col, meta in schema.items():
+        if meta['role'] == 'id' and 'customer' not in col.lower() and 'user' not in col.lower():
+            return col
+    # Fallback if the only ID is customer_id
+    for col, meta in schema.items():
         if meta['role'] == 'id':
+            return col
+    return None
+
+def get_customer_id_column(schema):
+    for col, meta in schema.items():
+        if 'customer' in col.lower() or 'user' in col.lower() or 'buyer' in col.lower():
+            if meta['role'] == 'id' or 'id' in col.lower():
+                return col
+    return None
+
+def get_location_column(schema):
+    locations = ['city', 'area', 'zone', 'region', 'location', 'neighborhood']
+    for col, meta in schema.items():
+        if any(loc in col.lower() for loc in locations):
             return col
     return None
 

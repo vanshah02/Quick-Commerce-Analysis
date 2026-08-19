@@ -19,11 +19,11 @@ def build_kpi_query(schema, filters, table_name="dataset"):
     f_clause, f_params = build_filter_clause(filters, valid_columns)
     
     measures = schema_inspector.get_measures(schema)
-    id_col = schema_inspector.get_id_column(schema)
+    id_cols = [col for col, meta in schema.items() if meta['role'] == 'id']
     
     selects = ["COUNT(*) as total_records"]
-    if id_col:
-        selects.append(f"COUNT(DISTINCT {id_col}) as distinct_{id_col}")
+    for id_c in id_cols:
+        selects.append(f"COUNT(DISTINCT {id_c}) as distinct_{id_c}")
         
     for m in measures:
         selects.append(f"SUM({m}) as sum_{m}")
@@ -78,65 +78,193 @@ def build_time_series_query(schema, date_col, measure, secondary_dim, filters, t
     """
     return query, f_params
 
-def build_top_items_by_quantity(schema, filters, table_name="dataset"):
+def build_top_items_by_quantity(schema, filters, item_col, qty_col, table_name="dataset"):
     valid_columns = list(schema.keys())
     f_clause, f_params = build_filter_clause(filters, valid_columns)
     query = f"""
-        SELECT item, SUM(quantity) as total_quantity
+        SELECT {item_col} as item, SUM({qty_col}) as total_quantity
         FROM {table_name}
-        WHERE 1=1 {f_clause} AND item IS NOT NULL
-        GROUP BY item
+        WHERE 1=1 {f_clause} AND {item_col} IS NOT NULL
+        GROUP BY {item_col}
         ORDER BY total_quantity DESC
         LIMIT 10
     """
     return query, f_params
 
-def build_top_items_by_frequency(schema, filters, table_name="dataset"):
+def build_top_items_by_frequency(schema, filters, item_col, id_col, table_name="dataset"):
     valid_columns = list(schema.keys())
     f_clause, f_params = build_filter_clause(filters, valid_columns)
     query = f"""
-        SELECT item, COUNT(DISTINCT order_id) as order_frequency
+        SELECT {item_col} as item, COUNT(DISTINCT {id_col}) as order_frequency
         FROM {table_name}
-        WHERE 1=1 {f_clause} AND item IS NOT NULL
-        GROUP BY item
+        WHERE 1=1 {f_clause} AND {item_col} IS NOT NULL
+        GROUP BY {item_col}
         ORDER BY order_frequency DESC
         LIMIT 10
     """
     return query, f_params
 
-def build_most_profitable_dishes(schema, filters, table_name="dataset"):
+def build_most_profitable_dishes(schema, filters, item_col, profit_col, revenue_col, table_name="dataset"):
     valid_columns = list(schema.keys())
     f_clause, f_params = build_filter_clause(filters, valid_columns)
+    
+    if revenue_col:
+        margin_sql = f"ROUND(SUM({profit_col}) * 100.0 / NULLIF(SUM(SUM({revenue_col})) OVER(), 0), 1) AS margin_pct"
+    else:
+        margin_sql = "0 AS margin_pct"
+        
     query = f"""
         SELECT 
-            item, 
-            SUM(line_profit) AS profit, 
-            ROUND(SUM(line_profit) * 100.0 / SUM(line_revenue), 1) AS margin_pct
+            {item_col} as item, 
+            SUM({profit_col}) AS profit, 
+            {margin_sql}
         FROM {table_name}
-        WHERE 1=1 {f_clause} AND item IS NOT NULL
-        GROUP BY item
+        WHERE 1=1 {f_clause} AND {item_col} IS NOT NULL
+        GROUP BY {item_col}
         ORDER BY profit DESC
         LIMIT 10
     """
     return query, f_params
 
-def build_best_combos_query(schema, filters, table_name="dataset"):
+def build_best_combos_query(schema, filters, item_col, id_col, table_name="dataset"):
     valid_columns = list(schema.keys())
     f_clause, f_params = build_filter_clause(filters, valid_columns, prefix="a.")
     
     query = f"""
         SELECT 
-            a.item AS item_a, 
-            b.item AS item_b, 
+            a.{item_col} AS item_a, 
+            b.{item_col} AS item_b, 
             COUNT(*) AS times_together 
         FROM {table_name} a 
         JOIN {table_name} b 
-            ON a.order_id = b.order_id 
-            AND a.item < b.item 
+            ON a.{id_col} = b.{id_col} 
+            AND a.{item_col} < b.{item_col} 
         WHERE 1=1 {f_clause}
-        GROUP BY a.item, b.item 
+        GROUP BY a.{item_col}, b.{item_col} 
         ORDER BY times_together DESC 
         LIMIT 10
+    """
+    return query, f_params
+
+def build_rfm_query(schema, filters, cust_id_col, date_col, revenue_col, table_name="dataset"):
+    valid_columns = list(schema.keys())
+    f_clause, f_params = build_filter_clause(filters, valid_columns)
+    
+    # Calculate Max Date in dataset for Recency calculation
+    # Since we can't easily do variables in single sqlite pass, we use scalar subquery
+    
+    query = f"""
+        WITH customer_stats AS (
+            SELECT 
+                {cust_id_col},
+                MAX({date_col}) as last_order_date,
+                COUNT(DISTINCT {date_col}) as frequency,
+                SUM({revenue_col}) as monetary,
+                (SELECT MAX({date_col}) FROM {table_name}) as max_db_date
+            FROM {table_name}
+            WHERE 1=1 {f_clause} AND {cust_id_col} IS NOT NULL
+            GROUP BY {cust_id_col}
+        ),
+        rfm_calc AS (
+            SELECT 
+                {cust_id_col},
+                CAST(julianday(max_db_date) - julianday(last_order_date) AS INTEGER) as recency,
+                frequency,
+                monetary
+            FROM customer_stats
+        ),
+        rfm_scores AS (
+            SELECT 
+                *,
+                NTILE(5) OVER (ORDER BY recency DESC) AS r_score,
+                NTILE(5) OVER (ORDER BY frequency ASC) AS f_score,
+                NTILE(5) OVER (ORDER BY monetary ASC) AS m_score
+            FROM rfm_calc
+        ),
+        segments AS (
+            SELECT 
+                *,
+                (r_score + f_score + m_score) / 3.0 as avg_score,
+                CASE 
+                    WHEN (r_score + f_score + m_score) / 3.0 >= 4 THEN 'Champions'
+                    WHEN (r_score + f_score + m_score) / 3.0 >= 3 THEN 'Loyal'
+                    WHEN (r_score + f_score + m_score) / 3.0 >= 2 THEN 'At Risk'
+                    ELSE 'Lost'
+                END as segment
+            FROM rfm_scores
+        )
+        SELECT 
+            segment, 
+            COUNT(*) as customer_count,
+            ROUND(AVG(monetary), 2) as avg_monetary
+        FROM segments
+        GROUP BY segment
+        ORDER BY avg_monetary DESC
+    """
+    
+    # Top 10 customers by monetary
+    top_cust_query = f"""
+        SELECT 
+            {cust_id_col} as customer_id,
+            SUM({revenue_col}) as monetary
+        FROM {table_name}
+        WHERE 1=1 {f_clause} AND {cust_id_col} IS NOT NULL
+        GROUP BY {cust_id_col}
+        ORDER BY monetary DESC
+        LIMIT 10
+    """
+    
+    return query, top_cust_query, f_params, f_params
+
+def build_churn_query(schema, filters, cust_id_col, date_col, location_col, table_name="dataset"):
+    valid_columns = list(schema.keys())
+    f_clause, f_params = build_filter_clause(filters, valid_columns)
+    
+    # Threshold is 60 days
+    query = f"""
+        WITH customer_last_order AS (
+            SELECT 
+                {cust_id_col},
+                {location_col if location_col else "'Unknown'"} as location,
+                MAX({date_col}) as last_order_date,
+                (SELECT MAX({date_col}) FROM {table_name}) as max_db_date
+            FROM {table_name}
+            WHERE 1=1 {f_clause} AND {cust_id_col} IS NOT NULL
+            GROUP BY {cust_id_col}, {location_col if location_col else "'Unknown'"}
+        ),
+        churn_status AS (
+            SELECT 
+                {cust_id_col},
+                location,
+                CASE 
+                    WHEN CAST(julianday(max_db_date) - julianday(last_order_date) AS INTEGER) > 60 THEN 'Churned'
+                    ELSE 'Active'
+                END as status
+            FROM customer_last_order
+        )
+        SELECT 
+            location,
+            status,
+            COUNT(*) as customer_count
+        FROM churn_status
+        GROUP BY location, status
+        ORDER BY location, status
+    """
+    return query, f_params
+
+def build_heatmap_query(schema, filters, location_col, table_name="dataset"):
+    valid_columns = list(schema.keys())
+    f_clause, f_params = build_filter_clause(filters, valid_columns)
+    
+    # Simple count by location
+    query = f"""
+        SELECT 
+            {location_col} as location,
+            COUNT(*) as order_density
+        FROM {table_name}
+        WHERE 1=1 {f_clause} AND {location_col} IS NOT NULL
+        GROUP BY {location_col}
+        ORDER BY order_density DESC
     """
     return query, f_params
 
