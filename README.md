@@ -1,44 +1,282 @@
-# Quick Analyser & SQL Portfolio Platform
+# Quick Commerce Analytics & SQL Intelligence Platform
 
-A comprehensive Data Analyst portfolio project simulating a real-world analytics dashboard for diverse datasets.  
+A dynamic analytics dashboard for exploring and analyzing quick-commerce order data using **Python, Pandas, SQLite, SQL, HTML, CSS and JavaScript**.
 
-This project goes beyond a simple frontend by embedding a **fully functional Python + SQLite backend**. It dynamically parses raw CSV transaction data into a relational database, executes complex SQL aggregations (including CTEs, window functions, and self-joins), and serves the insights via a REST API to a custom-built, Zomato-themed dashboard.
+The main goal of this project is to take a CSV dataset and automatically generate useful business insights instead of creating a dashboard that only works for one fixed dataset.
 
 ## Features
 
-1.  **Zero-Dependency Backend**: Built entirely with Python's standard library (`http.server` & `sqlite3`) and `pandas` for ETL. Runs anywhere instantly.
-2.  **Relational SQL Engine**: Ingests flat CSVs and processes analytics using advanced SQL.
-3.  **Interactive Executive Dashboard**: 
-    -   Key Performance Indicators (Revenue, Orders, Margins, AOV).
-    -   **Regional Contribution**: Tracks percentage of total sales per region using SQL Window functions.
-    -   **Most Profitable Items**: Margin analysis and volume tracking.
-    -   **Peak Activity Hours**: Temporal heatmap analysis.
-    -   **Market Basket Analysis**: SQL Self-Joins to discover the most frequent item combinations.
-4.  **SQL Query Inspector**: Every KPI and Chart has a "View SQL" button that reveals the exact query executed behind the scenes.
-5.  **Live SQL Studio**: An embedded interactive SQL playground with a gallery of interview-grade SQL questions. Run raw queries against the dataset and export the results to CSV!
-6.  **Dynamic Dataset Upload**: Drag-and-drop a new CSV file to instantly rebuild the database and refresh the dashboard.
+* Upload and analyze CSV datasets
+* Automatic dataset/schema detection
+* Dynamic filters based on available columns
+* Revenue and order analysis
+* Top-performing products
+* Product/category performance
+* Peak activity analysis
+* Frequently purchased product combinations
+* Business insights from the available data
+* Interactive charts and dashboard
+* SQL query viewer for individual analyses
+* SQL Studio for running custom queries
+* Export SQL query results as CSV
+* SQLite database integration
 
-## Setup & Running
+## How It Works
 
-1.  Ensure you have Python 3 installed.
-2.  Install requirements:
-    ```bash
-    pip install -r requirements.txt
-    ```
-    *(Note: The only external requirement is `pandas` and `numpy` for parsing the CSV).*
-3.  Run the application:
-    ```bash
-    python3 app.py
-    ```
-4.  Open your browser and navigate to `http://localhost:8000/`.
+The application first reads the uploaded CSV and checks its columns and data types.
 
-## Resume Bullet Points
+Based on the dataset, it identifies useful fields such as:
 
-If you are using this project for your resume, here are a few ways to describe your work:
+* IDs
+* Categories
+* Numeric columns
+* Date/time columns
+* Product/item fields
 
-*   **Data Architecture**: Architected a local SQLite data warehouse to ingest and normalize flat food delivery transaction records, enabling high-performance analytical queries.
-*   **SQL & Business Intelligence**: Authored advanced SQL scripts utilizing CTEs, Window Functions (e.g., `SUM() OVER(PARTITION BY...)`), and Self-Joins to compute regional sales contributions, delivery latencies, and market basket combinations.
-*   **Full-Stack Analytics**: Developed a custom REST API using Python and built an interactive dashboard leveraging Vanilla CSS and Chart.js to visualize KPIs, margin analysis, and temporal heatmaps.
-*   **Data Tooling**: Implemented an interactive "SQL Studio" within the application, allowing real-time query execution, syntax highlighting, and CSV export capabilities for ad-hoc analysis.
+The data is then loaded into SQLite and used to generate the required SQL queries for the dashboard.
 
-*Styled with a custom modern executive theme (Red, Black, and White).*
+This makes the dashboard flexible enough to work with different datasets without manually changing every chart and filter.
+
+## Analytics Included
+
+### Overview
+
+The dashboard provides important KPIs such as:
+
+* Total records/orders
+* Total revenue
+* Total quantity
+* Average values
+* Other relevant metrics depending on the dataset
+
+### Product Analysis
+
+The application can identify:
+
+* Top products by quantity
+* Most frequently ordered products
+* Best-performing categories
+* Revenue contribution
+* Profit-related metrics when available
+
+### Peak Activity
+
+If the dataset contains a date/time column, the application can analyze activity across different hours or time periods to identify peak demand.
+
+### Product Combinations
+
+The application uses order-level data to find products that are commonly purchased together.
+
+This can be useful for:
+
+* Combo offers
+* Cross-selling
+* Product recommendations
+* Understanding customer buying patterns
+
+## Dynamic Filters
+
+Filters are not completely hardcoded.
+
+The application checks the uploaded dataset and generates filters based on the categorical fields available in that dataset.
+
+For example, one dataset may provide:
+
+* City
+* Category
+* Cuisine
+
+while another may provide:
+
+* Region
+* Department
+* Product Type
+
+The dashboard adjusts accordingly.
+
+## Business Use Cases
+
+The dashboard can help answer questions such as:
+
+* Which products generate the most revenue?
+* Which products are ordered most frequently?
+* Which categories perform the best?
+* What are the busiest ordering periods?
+* Which locations contribute the most?
+* Which products are commonly purchased together?
+* Where can combo offers or cross-selling be introduced?
+
+## SQL Analysis
+
+SQL is used extensively throughout the project for data analysis.
+
+Some of the SQL concepts used include:
+
+* `SELECT`
+* `WHERE`
+* `GROUP BY`
+* `ORDER BY`
+* `COUNT`
+* `SUM`
+* `AVG`
+* `DISTINCT`
+* CTEs
+* Window functions
+* Self joins
+* Ranking
+* Date/time based analysis
+
+The **View SQL** option allows users to see the query used for a particular analysis.
+
+## SQL Studio
+
+The project also includes an SQL Studio where users can write and execute their own analytical queries.
+
+Example:
+
+```sql
+SELECT
+    category,
+    SUM(revenue) AS total_revenue
+FROM orders
+GROUP BY category
+ORDER BY total_revenue DESC;
+```
+
+Query results can also be exported as CSV.
+
+## Tech Stack
+
+**Frontend**
+
+* HTML
+* CSS
+* JavaScript
+* Chart.js
+
+**Backend**
+
+* Python
+* Pandas
+* SQLite
+* REST API
+
+**Database**
+
+* SQLite
+
+**Data Analysis**
+
+* SQL
+* Pandas
+
+## Project Structure
+
+```text
+Quick-Commerce-Analysis/
+│
+├── app.py
+├── db_manager.py
+├── query_builder.py
+├── schema_inspector.py
+├── sql_queries.py
+├── requirements.txt
+│
+├── static/
+│   ├── index.html
+│   ├── css/
+│   └── js/
+│
+├── datasets/
+│
+└── README.md
+```
+
+## Installation
+
+Clone the repository:
+
+```bash
+git clone <your-repository-url>
+cd Quick-Commerce-Analysis
+```
+
+Create a virtual environment:
+
+```bash
+python3 -m venv .venv
+```
+
+Activate it:
+
+### macOS / Linux
+
+```bash
+source .venv/bin/activate
+```
+
+### Windows
+
+```bash
+.venv\Scripts\activate
+```
+
+Install the required packages:
+
+```bash
+pip install -r requirements.txt
+```
+
+## Run the Project
+
+Start the application:
+
+```bash
+python3 app.py
+```
+
+Then open the local URL shown by the application in your browser.
+
+## Dataset
+
+The project can be used with the included quick-commerce/order dataset or with another CSV containing suitable transactional data.
+
+For the best results, the dataset should contain fields such as:
+
+* Order ID
+* Product/Item
+* Category
+* Quantity
+* Revenue/Sales
+* Date/Time
+* Location
+
+The application will use whatever relevant fields are available rather than requiring an exact column structure.
+
+
+## Future Improvements
+
+Some possible additions to the project are:
+
+* AI-generated business insights
+* Sales forecasting
+* Customer segmentation
+* RFM analysis
+* Recommendation system
+* Advanced market basket analysis
+* Anomaly detection
+* PDF/Excel report generation
+* User authentication
+* Cloud database support
+
+## Author
+
+**Vansh Shah**
+
+B.Tech Information Technology
+
+---
+
+### Project Focus
+
+**Turning raw order data into useful business insights using Python, SQL and interactive analytics.**
